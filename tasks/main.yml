@@ -1,0 +1,5 @@
+---
+# lxc containers creation
+
+- include: create.yml
+

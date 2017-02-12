@@ -1,0 +1,38 @@
+---
+- name: Installation des packages lxc
+  yum:
+    name: "{{ item }}"
+    state: latest
+  with_items:
+    - lxc
+    - lxc-extra
+    - lxc-devel
+    - debootstrap
+  tags:
+    - create
+
+- name: Installation des bindings python pour lxc
+  pip:
+    name: lxc-python2
+    state: latest
+  tags:
+    - create
+
+- name: Création des containers
+  lxc_container:
+    name: "{{ item.name }}"
+    container_log: true
+    template: "{{ item.template }}"
+    state: started
+    template_options: "--release {{ item.release }}"
+  with_items: "{{ lxc_deploy_containers }}"
+  tags:
+    - create
+
+- name: Installation de python sur les containers
+  lxc_container:
+    name: "{{ item.name }}"
+    container_command: |
+      {{ item.pkg_mgr }} update -y
+      {{ item.pkg_mgr }} install -y python sudo
+  with_items: "{{ lxc_deploy_containers }}"
