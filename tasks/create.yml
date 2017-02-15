@@ -1,13 +1,12 @@
 ---
 - name: Installation des packages lxc
-  yum:
+  apt:
     name: "{{ item }}"
     state: latest
   with_items:
     - lxc
-    - lxc-extra
-    - lxc-devel
-    - debootstrap
+    - lxc-dev
+    - yum
   tags:
     - create
 
@@ -23,9 +22,21 @@
     name: "{{ item.name }}"
     container_log: true
     template: "{{ item.template }}"
-    state: started
+    state: stopped
     template_options: "--release {{ item.release }}"
   with_items: "{{ lxc_deploy_containers }}"
+  tags:
+    - create
+
+- name: Ajout des lignes de configuration supplémentaires
+  lineinfile:
+    dest: "/var/lib/lxc/{{ item.0.name }}/config"
+    line: "{{ item.1 }}"
+  with_subelements:
+    - "{{ lxc_deploy_containers }}"
+    - extra_conf
+    - flags:
+      skip_missing: True
   tags:
     - create
 
@@ -36,3 +47,5 @@
       {{ item.pkg_mgr }} update -y
       {{ item.pkg_mgr }} install -y python sudo
   with_items: "{{ lxc_deploy_containers }}"
+  tags:
+    - create
