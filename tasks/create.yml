@@ -12,8 +12,11 @@
 
 - name: Installation des bindings python pour lxc
   pip:
-    name: lxc-python2
+    name: "{{ item }}"
     state: latest
+  with_items:
+    - lxc-python2
+    - jmespath
   tags:
     - create
 
@@ -22,9 +25,10 @@
     name: "{{ item.name }}"
     container_log: true
     template: "{{ item.template }}"
-    state: stopped
+    state: started
     template_options: "--release {{ item.release }}"
   with_items: "{{ lxc_deploy_containers }}"
+  register: add_lxc_container
   tags:
     - create
 
@@ -37,6 +41,18 @@
     - extra_conf
     - flags:
       skip_missing: True
+  register: add_lxc_config
+  tags:
+    - create
+
+- name: Restart du container si des configurations supplémentaires ont été ajoutées
+  lxc_container:
+    name: "{{ item.name }}"
+    state: restarted
+  with_items: "{{ add_lxc_config.results | json_query(query) | unique }}"
+  when: item.changed == True
+  vars:
+    query: "[*].{changed: changed, name: item[0].name}"
   tags:
     - create
 
@@ -46,6 +62,9 @@
     container_command: |
       {{ item.pkg_mgr }} update -y
       {{ item.pkg_mgr }} install -y python sudo
-  with_items: "{{ lxc_deploy_containers }}"
+  with_items: "{{ add_lxc_container | json_query(query) }}"
+  when: item.changed == True
+  vars:
+    query: "results[*].{changed: changed, name: item.name, pkg_mgr: item.pkg_mgr}"
   tags:
     - create
