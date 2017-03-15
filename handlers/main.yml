@@ -1,2 +1,14 @@
 ---
 # handlers file for lxc-deploy
+- name: stop lxc-net
+  service:
+    name: lxc-net
+    state: stopped
+
+- name: delete dhcp leases
+  shell: "echo '' > /var/lib/misc/dnsmasq.lxcbr0.leases"
+
+- name: start lxc-net
+  service:
+    name: lxc-net
+    state: started

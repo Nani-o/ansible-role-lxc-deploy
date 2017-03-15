@@ -1,5 +1,115 @@
 ---
-# lxc containers creation
+- name: Installation des packages lxc
+  apt:
+    name: "{{ item }}"
+    state: latest
+  with_items:
+    - lxc
+    - lxc-dev
+    - yum
+  tags:
+    - create
 
-- include: create.yml
+- name: Installation des bindings python pour lxc
+  pip:
+    name: "{{ item }}"
+    state: latest
+  with_items:
+    - lxc-python2
+    - jmespath
+  tags:
+    - create
 
+- name: Configuration réseau de lxc
+  template:
+    src: lxc-net.j2
+    dest: /etc/default/lxc-net
+  notify:
+    - stop lxc-net
+    - start lxc-net
+  tags:
+    - create
+
+- name: Copie du fichier dnsmasq
+  template:
+    src: dnsmasq.conf.j2
+    dest: /etc/lxc/dnsmasq.conf
+  notify:
+    - stop lxc-net
+    - start lxc-net
+  tags:
+    - create
+
+- name: Copie des entrées dhcp
+  lineinfile:
+    dest: /etc/lxc/dnsmasq-hosts.conf
+    line: "{{ item.value.name }},{{ item.value.ip }}"
+    regexp: "{{ item.value.name }},.*"
+  with_dict: "{{ lxc_deploy_containers }}"
+  register: add_dhcp_entry
+  when: item.value.ip is defined
+  notify:
+    - stop lxc-net
+    - delete dhcp leases
+    - start lxc-net
+  tags:
+    - create
+
+- name: Création des containers
+  lxc_container:
+    name: "{{ item.value.name }}"
+    container_log: true
+    template: "{{ item.value.template }}"
+    state: started
+    template_options: "--release {{ item.value.release }}"
+  with_dict: "{{ lxc_deploy_containers }}"
+  register: add_lxc_container
+  notify:
+    - stop lxc-net
+    - delete dhcp leases
+    - start lxc-net
+  tags:
+    - create
+
+- name: Installation de python sur les containers
+  lxc_container:
+    name: "{{ item.name }}"
+    container_command: |
+      {{ item.pkg_mgr }} update -y
+      {{ item.pkg_mgr }} install -y python sudo
+  with_items: "{{ add_lxc_container | json_query(query) }}"
+  when: item.changed == True
+  vars:
+    query: "results[*].{changed: changed, name: item.value.name, pkg_mgr: item.value.pkg_mgr}"
+  tags:
+    - create
+
+- name: Ajout des lignes de configuration supplémentaires
+  lineinfile:
+    dest: "/var/lib/lxc/{{ item.0.name }}/config"
+    line: "{{ item.1 }}"
+  with_subelements:
+    - "{{ lxc_deploy_containers }}"
+    - extra_conf
+    - flags:
+      skip_missing: True
+  register: add_lxc_config
+  tags:
+    - create
+
+- name: Déclenchement des handlers
+  meta: flush_handlers
+  tags:
+    - create
+
+- name: Restart du container fraîchement créé ou modifié
+  lxc_container:
+    name: "{{ item.name }}"
+    state: restarted
+  with_items: "{{ (add_dhcp_entry | json_query(query) + add_lxc_container | json_query(query) + add_lxc_config | json_query(query2)) | unique }}"
+  when: item.changed == True
+  vars:
+    query: "results[*].{changed: changed, name: item.value.name}"
+    query2: "results[*].{changed: changed, name: item[0].name}"
+  tags:
+    - create
