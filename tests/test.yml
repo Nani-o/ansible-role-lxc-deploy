@@ -1,5 +1,23 @@
 ---
 - hosts: localhost
-  remote_user: root
+  become: true
+  vars:
+    lxc_deploy_dhcp:
+      address: 192.168.2.1
+      netmask: 255.255.255.0
+      network: 192.168.2.0/24
+      range: 192.168.2.2,192.168.2.254
+      max: 253
+    lxc_deploy_containers:
+      centos:
+        name: centos
+        ip: 192.168.2.5
+        template: centos
+        release: 7
+        pkg_mgr: yum
+        extra_conf:
+          - lxc.mount.entry = /dev/net dev/net none bind,create=dir
+          - lxc.cgroup.devices.allow = c 10:200 rwm
   roles:
     - ansible-role-lxc-deploy
+

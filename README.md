@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/Nani-o/ansible-role-lxc-deploy.svg?branch=master)](https://travis-ci.org/Nani-o/ansible-role-lxc-deploy)
+
 lxc-deploy
 ==========
 
