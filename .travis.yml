@@ -13,7 +13,7 @@ addons:
 
 install:
   # Install ansible
-  - pip install ansible
+  - pip install ansible jmespath
 
   # Check ansible version
   - ansible --version
@@ -27,6 +27,27 @@ script:
 
   # Execution of the playbook
   - ansible-playbook tests/test.yml -i tests/inventory
+
+  # Test role idempotency
+  - |
+    ansible-playbook tests/test.yml -i tests/inventory \
+    | grep -q 'changed=0.*failed=0' \
+    && (echo 'Idempotence test: pass' && exit 0) \
+    || (echo 'Idempotence test: fail' && exit 1)
+
+  # Check that we deployed a Centos 7 container named container1
+  - |
+    sudo lxc-attach -n container1 -- cat /etc/redhat-release | grep 'CentOS Linux release 7' \
+    && (echo 'Container creation test: pass' && exit 0) \
+    || (echo 'Container creation test: fail' && exit 1)
+
+  - sudo lxc-attach -n container1 -- hostname -I
+
+  # Check that DHCP correctly assign the desired ip to container1
+  - |
+    sudo lxc-attach -n container1 -- hostname -I | tr -d ' ' | grep -e '^1.1.1.11$' \
+    && (echo 'Container dhcp ip test: pass' && exit 0) \
+    || (echo 'Container dhcp ip test: failed' && exit 1)
 
 notifications:
   webhooks: https://galaxy.ansible.com/api/v1/notifications/
