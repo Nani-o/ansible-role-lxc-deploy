@@ -45,6 +45,7 @@
     dest: /etc/lxc/dnsmasq-hosts.conf
     line: "{{ item.value.name }},{{ item.value.ip }}"
     regexp: "{{ item.value.name }},.*"
+    create: yes
   with_dict: "{{ lxc_deploy_containers }}"
   register: add_dhcp_entry
   when: item.value.ip is defined
