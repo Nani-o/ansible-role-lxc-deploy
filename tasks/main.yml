@@ -56,6 +56,9 @@
   tags:
     - create
 
+- name: Force du run des handlers
+  meta: flush_handlers
+
 - name: Création des containers
   lxc_container:
     name: "{{ item.value.name }}"
